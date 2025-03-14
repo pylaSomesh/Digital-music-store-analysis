@@ -1,0 +1,206 @@
+1) Find the artist who has contributed with the maximum no of songs. Display the artist name and the no of albums.
+
+
+with cte as
+    (select ar.name as artist_name, count(1) as no_of_songs
+     , rank() over (order by count(1) desc) as rnk
+    from track t
+    join Album al on al.album_id = t.album_id
+    join artist ar on ar.artist_id = al.artist_id
+    group by ar.name)
+select artist_name, no_of_songs
+from cte
+where rnk = 1;
+
+
+
+
+2) Display the name, email id, country of all listeners who love Jazz, Rock and Pop music.
+
+select first_name||last_name as name,country,email,g.name as genre_name
+from customer c 
+join invoice i
+on c.customer_id =i.customer_id
+join invoice_line il
+on il.invoice_id = i.invoice_id
+join track t 
+on t.track_id = il.track_id
+join genre g 
+on g.genre_id = t.genre_id
+where t.genre_id in ('1','2','9') and g.genre_id in ('1','2','9')
+order by g.name
+
+
+
+
+
+3) Find the employee who has supported the most no of customers. Display the employee name and designation
+
+with cte as 
+     ( select  distinct e.first_name ||' ' || e.last_name as name, e.title ,e.employee_id,count(c.support_rep_id) ,
+	  rank() over(order by count(0) desc ) as rnk
+       from employee  e
+      join customer c
+     on e.employee_id  = c.support_rep_id 
+     where c.support_rep_id in (select employee_id from employee)
+	 group by e.first_name,e.last_name ,e.title ,e.employee_id)
+	 
+	 select name, employee_id 
+	  from cte 
+	  where rnk = 1
+
+
+
+
+4) Which city corresponds to the best customers?
+
+with cte as (
+select c.city as city_with_best_customers ,count(c.customer_id) as No_of_customers,
+	rank() over(order by count(1) desc) as rnk
+from customer c 
+join invoice i 
+on i.customer_id = c.customer_id
+where i.customer_id = c.customer_id
+group by i.billing_city,c.city)
+
+select city_with_best_customers,No_of_customers from cte where rnk = 1
+
+
+
+
+
+
+5) Name the best customer (customer who spent the most money).
+
+with cte as
+(select c.customer_id,c.first_name || '   ' || c.last_name as best_customer,sum(unit_price) as Total_money_spent,
+       rank() over(order by sum(unit_price) desc) as rnk
+			 
+     from invoice_line il
+     join invoice i 
+     on il.invoice_id = i.invoice_id
+     join customer c
+     on c.customer_id = i.customer_id
+
+     group by c.customer_id
+     order by sum(unit_price) desc)
+select best_customer , customer_id,Total_money_spent  from cte
+where rnk =1 ;
+
+
+
+
+
+6) Suppose you want to host a rock concert in a city and want to know which location should host it.
+
+
+with cte as (
+select i.billing_city as Best_city_for_rock_concert ,count(i.billing_city ) as addd,
+	rank() over(order by count(1) desc ) as rnk from invoice_line il
+join track t    on il.track_id = t.track_id 
+join invoice i 
+on i.invoice_id = il.invoice_id
+where t.genre_id = 1
+group by i.billing_city
+	order by count(0) desc)
+--having t.genre_id = 1)
+select  Best_city_for_rock_concert 
+from cte 
+where rnk = 1;
+
+
+
+
+7) Identify all the albums who have less then 5 track under them.
+
+select t.album_id,a.title ,count(track_id) as track_count
+from album a 
+join track t
+on a.album_id = t.album_id
+group by t.album_id,a.title 
+having count(1) < 5
+order by album_id
+
+
+
+8) Display the track, album, artist and the genre for all tracks which are not purchased.
+
+select t.track_id as unpurchased_track_id,t.name as track_name ,a.title as album_title,ar.name as artist_name,g.name as genre_name
+from track t
+join album a 
+on  a.album_id = t.album_id
+join artist ar 
+on  ar.artist_id = a.artist_id
+join genre g 
+on g.genre_id = t.genre_id
+where track_id not in (select track_id from invoice_line)
+
+
+
+
+
+
+9) Find artist who have performed in multiple genres. Diplay the aritst name and the genre.
+
+with cte as
+        (select distinct ar.name as artist_name, g.name as genre_name
+        from track t
+        join album al on al.album_id = t.album_id
+        join artist ar on ar.artist_id = al.artist_id
+        join genre g on g.genre_id = t.genre_id ),
+    multiple_genre as
+        (select artist_name, count(1)
+        from cte
+        group by artist_name
+        having count(1) > 1)
+select mg.artist_name, cte.genre_name
+from multiple_genre mg
+join cte on cte.artist_name = mg.artist_name
+order by 1,2;
+
+
+
+
+10) Which is the most popular and least popular genre? (Popularity is defined based on how many times it has been purchased.)
+
+with cte as
+    (select g.name as genre_name, count(1) as no_of_purchase
+    , rank() over(order by count(1) desc) rnk
+    from invoice_line il
+    join track t on t.track_id = il.track_id
+    join genre g on g.genre_id = t.genre_id
+    group by g.name)
+select genre_name, 'Most Popular' as Popularity
+from cte
+where rnk = 1
+union
+select genre_name, 'Least Popular' as Popularity
+from cte
+where rnk = (select max(rnk) from cte)
+
+
+
+
+
+11) Identify the 5 most popular artist for the most popular genre. Display the artist name along with the no of songs. (Popularity is defined based on how many songs an artist has performed in for the particular genre.)
+ 
+   with cte as
+        (select g.genreid, g.name as genre_name, count(1) as no_of_purchase
+        , rank() over(order by count(1) desc) rnk
+        from invoiceline il
+        join track t on t.trackid = il.trackid
+        join genre g on g.genreid = t.genreid
+        group by g.genreid, g.name),
+      most_popular_genre as
+        (select genreid, genre_name from cte where rnk = 1 )  ,
+      final_data as
+        (select  ar.name as artist_name, count(1) as no_of_songs
+         , rank() over (order by count(1) desc) as rnk
+        from track t
+        join album al on al.albumid = t.albumid
+        join artist ar on ar.artistid = al.artistid
+        join most_popular_genre pop on pop.genreid = t.genreid
+        group by ar.name)
+select artist_name, no_of_songs
+from final_data
+where rnk < 6;
