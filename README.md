@@ -1,5 +1,5 @@
 
-# Digital-music-store-anaysis
+# Digital-music-store-analysis
 
 
     
